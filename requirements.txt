@@ -1,0 +1,4 @@
+pyTelegramBotAPI==4.34.0
+python-dotenv==1.2.2
+beautifulsoup4==4.15.0
+selenium==4.45.0
