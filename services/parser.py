@@ -29,6 +29,25 @@ def create_browser():
     return webdriver.Chrome(options=options)
 
 
+def _collect_reviews(browser):
+    html = browser.page_source
+    soup = BeautifulSoup(html, 'html.parser')
+    reviews = []
+
+    cards = soup.select(".comments__item.feedback")
+    for card in cards:
+        text_items = card.select("[class*='feedback__text--item']")
+        if text_items:
+            parts = []
+            for item in text_items:
+                parts.append(item.get_text(strip=True))
+            review_text = " ".join(parts)
+            if review_text and len(review_text) > 10:
+                reviews.append(review_text)
+
+    return reviews
+
+
 def get_wb_reviews(url):
     browser = None
     try:
@@ -41,20 +60,35 @@ def get_wb_reviews(url):
         browser.get(page_url)
         time.sleep(15)
 
-        html = browser.page_source
-        soup = BeautifulSoup(html, 'html.parser')
-        reviews = []
+        reviews = _collect_reviews(browser)
 
-        cards = soup.select(".comments__item.feedback")
-        for card in cards:
-            text_items = card.select("[class*='feedback__text--item']")
-            if text_items:
-                parts = []
-                for item in text_items:
-                    parts.append(item.get_text(strip=True))
-                review_text = " ".join(parts)
-                if review_text and len(review_text) > 10:
-                    reviews.append(review_text)
+        for attempt in range(10):
+            try:
+                browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
+
+                clicked = False
+                buttons = browser.find_elements(By.CSS_SELECTOR, "button")
+                for btn in buttons:
+                    btn_text = btn.text.strip().lower()
+                    if ("показать ещё" in btn_text or
+                        "показать еще" in btn_text or
+                        "все отзыв" in btn_text):
+                        btn.click()
+                        clicked = True
+                        time.sleep(3)
+                        break
+
+                if not clicked:
+                    break
+
+                new_reviews = _collect_reviews(browser)
+                if len(new_reviews) <= len(reviews):
+                    break
+                reviews = new_reviews
+
+            except Exception:
+                break
 
         return reviews
 
