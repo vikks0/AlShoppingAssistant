@@ -111,28 +111,28 @@ def format_result(gpt_text, total_reviews, positive, negative):
     pluses, minuses, recommendation = _parse_gpt_response(gpt_text)
 
     result = ""
-    result = result + "📊 Анализ отзывов\n"
+    result = result + "Анализ отзывов\n"
     result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    result = result + "📝 Отзывов: " + str(total_reviews) + "\n"
-    result = result + "😊 Положительных: " + str(positive) + " (" + str(pos_percent) + "%)\n"
-    result = result + "😐 Нейтральных: " + str(neutral) + " (" + str(neu_percent) + "%)\n"
-    result = result + "😞 Отрицательных: " + str(negative) + " (" + str(neg_percent) + "%)\n"
+    result = result + "Отзывов: " + str(total_reviews) + "\n"
+    result = result + "Положительных: " + str(positive) + " (" + str(pos_percent) + "%)\n"
+    result = result + "Нейтральных: " + str(neutral) + " (" + str(neu_percent) + "%)\n"
+    result = result + "Отрицательных: " + str(negative) + " (" + str(neg_percent) + "%)\n"
     result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
     if pluses:
-        result = result + "\n✅ Плюсы\n"
+        result = result + "\nПлюсы\n"
         for p in pluses:
-            result = result + "• " + p + "\n"
+            result = result + "- " + p + "\n"
 
     if minuses:
-        result = result + "\n⚠️ Минусы\n"
+        result = result + "\nМинусы\n"
         for m in minuses:
-            result = result + "• " + m + "\n"
+            result = result + "- " + m + "\n"
 
     if not pluses and not minuses and gpt_text:
-        result = result + "\n🤖 " + gpt_text + "\n"
+        result = result + "\n" + gpt_text + "\n"
 
-    result = result + "\n⭐ Итог\n"
+    result = result + "\nИтог\n"
     if recommendation:
         result = result + recommendation + "\n"
     elif pos_percent >= 70:
@@ -143,3 +143,71 @@ def format_result(gpt_text, total_reviews, positive, negative):
         result = result + "Лучше поискать другой вариант.\n"
 
     return result
+
+
+def format_comparison(results):
+    """Форматирует результат сравнения товаров."""
+    text = "Сравнение товаров\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+    for i in range(len(results)):
+        item = results[i]
+        num = i + 1
+        total = item["reviews_count"]
+        pos = item["positive"]
+        neg = item["negative"]
+
+        if total > 0:
+            pos_percent = round(pos / total * 100)
+            neg_percent = round(neg / total * 100)
+        else:
+            pos_percent = 0
+            neg_percent = 0
+
+        pluses, minuses, _ = _parse_gpt_response(item["analysis"])
+
+        url = item["url"]
+        if len(url) > 50:
+            short_url = url[:50] + "..."
+        else:
+            short_url = url
+
+        text = text + "Товар " + str(num) + "\n"
+        text = text + short_url + "\n"
+        text = text + str(total) + " отзывов | +" + str(pos_percent) + "% | -" + str(neg_percent) + "%\n"
+
+        if pluses:
+            top_pluses = pluses[:3]
+            text = text + "+ " + ", ".join(top_pluses) + "\n"
+        if minuses:
+            top_minuses = minuses[:3]
+            text = text + "- " + ", ".join(top_minuses) + "\n"
+
+        text = text + "\n" + "─" * 30 + "\n\n"
+
+    if len(results) > 1:
+        scores = []
+        for i in range(len(results)):
+            item = results[i]
+            num = i + 1
+            if item["reviews_count"] > 0:
+                pos_percent = round(item["positive"] / item["reviews_count"] * 100)
+            else:
+                pos_percent = 0
+            scores.append([num, pos_percent])
+
+        for i in range(len(scores)):
+            for j in range(i + 1, len(scores)):
+                if scores[j][1] > scores[i][1]:
+                    temp = scores[i]
+                    scores[i] = scores[j]
+                    scores[j] = temp
+
+        text = text + "Итог\n"
+        for rank in range(len(scores)):
+            num = scores[rank][0]
+            score = scores[rank][1]
+            text = text + str(rank + 1) + ". Товар " + str(num) + ": " + str(score) + "% положительных\n"
+
+        text = text + "\nТовар " + str(scores[0][0]) + " — лучший по отзывам покупателей."
+
+    return text

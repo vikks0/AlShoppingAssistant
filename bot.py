@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from services.parser import get_reviews
 from services.ai import analyze_reviews
-from services.formatter import count_sentiments, format_result
+from services.formatter import count_sentiments, format_result, format_comparison
 from services.database import Database
 
 load_dotenv()
@@ -121,14 +121,18 @@ def handle_text(message):
                 parse_mode="Markdown", reply_markup=create_main_menu())
             return
 
-        if len(wb_links) == 1:
-            analyze_single(message, wb_links[0])
-        else:
+        if len(wb_links) > 5:
             bot.send_message(chat_id,
                 "Слишком много ссылок.\n\n"
                 "Можно сравнить максимум 5 товаров.\n"
                 "Отправьте не более 5 ссылок.",
                 reply_markup=create_main_menu())
+            return
+
+        if len(wb_links) == 1:
+            analyze_single(message, wb_links[0])
+        else:
+            compare_products(message, wb_links)
     else:
         bot.send_message(chat_id,
             "Я не понял сообщение.\n\n"
@@ -172,6 +176,58 @@ def analyze_single(message, url):
         bot.send_message(chat_id,
             "Произошла ошибка: " + type(e).__name__ + "\n\n"
             "Попробуйте позже или отправьте другой товар.",
+            reply_markup=create_main_menu())
+
+
+def compare_products(message, urls):
+    chat_id = message.chat.id
+    bot.send_message(chat_id,
+        "Начинаю сравнение " + str(len(urls)) + " товаров...\nЭто может занять больше времени.")
+
+    try:
+        all_results = []
+        errors = []
+
+        for i in range(len(urls)):
+            url = urls[i]
+            num = i + 1
+            bot.send_message(chat_id, "Анализирую товар " + str(num) + "/" + str(len(urls)) + "...")
+
+            reviews = get_reviews(url)
+            if not reviews:
+                errors.append("Товар " + str(num) + ": отзывы не загружены")
+                continue
+
+            all_reviews = "\n\n".join(reviews)
+            positive, negative = count_sentiments(reviews)
+            gpt_result = analyze_reviews(all_reviews)
+
+            all_results.append({
+                "url": url,
+                "reviews_count": len(reviews),
+                "positive": positive,
+                "negative": negative,
+                "analysis": gpt_result
+            })
+            db.add_history(chat_id, "compare", url)
+
+        if not all_results:
+            bot.send_message(chat_id,
+                "Не удалось загрузить ни один товар.\nПроверьте ссылки и попробуйте снова.",
+                reply_markup=create_main_menu())
+            return
+
+        final_result = format_comparison(all_results)
+        bot.send_message(chat_id, final_result, reply_markup=create_main_menu())
+
+        if errors:
+            error_text = "Не удалось загрузить:\n" + "\n".join(errors)
+            bot.send_message(chat_id, error_text)
+
+    except Exception as e:
+        traceback.print_exc()
+        bot.send_message(chat_id,
+            "Произошла ошибка: " + type(e).__name__ + "\n\nПопробуйте позже.",
             reply_markup=create_main_menu())
 
 
