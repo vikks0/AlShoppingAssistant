@@ -56,6 +56,46 @@ def show_section(call, title, body):
                          reply_markup=create_back_button())
 
 
+def show_history(call):
+    user_id = call.from_user.id
+    history = db.get_history(user_id)
+
+    if not history:
+        text = "Моя история\n" + "━" * 24 + "\n\n"
+        text = text + "У вас пока нет запросов.\nНачните с анализа товара!"
+    else:
+        text = "Моя история\n" + "━" * 24 + "\n\n"
+        count = 0
+        for record in history:
+            if count >= 10:
+                break
+            action = record[2]
+            url = record[3]
+            date = record[4]
+
+            if len(url) > 50:
+                short_url = url[:50] + "..."
+            else:
+                short_url = url
+
+            if action == "analyze":
+                icon = "[анализ]"
+            elif action == "compare":
+                icon = "[сравнение]"
+            else:
+                icon = "[анализ]"
+
+            text = text + "- " + icon + " " + date + "\n  " + short_url + "\n\n"
+            count = count + 1
+
+        if len(history) > 10:
+            text = text + "...и ещё " + str(len(history) - 10) + " запросов\n"
+
+    bot.edit_message_text(text, call.message.chat.id,
+                         call.message.message_id,
+                         reply_markup=create_back_button())
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     data = call.data
@@ -90,7 +130,7 @@ def callback_handler(call):
             "Отправьте ссылки следующим сообщением:")
 
     elif data == "menu_history":
-        bot.answer_callback_query(call.id)
+        show_history(call)
 
     elif data == "menu_back":
         bot.edit_message_text(WELCOME_TEXT, chat_id,
