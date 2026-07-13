@@ -6,8 +6,9 @@ from dotenv import load_dotenv
 
 from services.parser import get_reviews
 from services.ai import analyze_reviews
-from services.formatter import count_sentiments, format_result, format_comparison
+from services.formatter import count_sentiments, format_result, format_comparison, format_solution
 from services.database import Database
+from services.solution import find_relevant_reviews, summarize_solution
 
 load_dotenv()
 
@@ -15,6 +16,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
 db = Database()
+
+user_reviews = {}
+user_states = {}
 
 WELCOME_TEXT = (
     "Привет! Я — *Анализатор отзывов*\n\n"
@@ -46,7 +50,13 @@ def cmd_start(message):
     username = message.from_user.username or "без_username"
     db.add_user(user_id, message.from_user.first_name, username)
 
-    bot.send_message(message.chat.id, WELCOME_TEXT, reply_markup=create_main_menu())
+    chat_id = message.chat.id
+    if chat_id in user_states:
+        del user_states[chat_id]
+    if chat_id in user_reviews:
+        del user_reviews[chat_id]
+
+    bot.send_message(chat_id, WELCOME_TEXT, reply_markup=create_main_menu())
 
 
 def show_section(call, title, body):
@@ -82,6 +92,8 @@ def show_history(call):
                 icon = "[анализ]"
             elif action == "compare":
                 icon = "[сравнение]"
+            elif action == "solution":
+                icon = "[решение]"
             else:
                 icon = "[анализ]"
 
@@ -102,6 +114,8 @@ def callback_handler(call):
     chat_id = call.message.chat.id
 
     if data == "menu_analyze":
+        if chat_id in user_states:
+            del user_states[chat_id]
         show_section(call, "Оценка товара",
             "Отправьте мне ссылку на товар Wildberries,\n"
             "и я загружу отзывы и проанализирую их.\n\n"
@@ -115,6 +129,8 @@ def callback_handler(call):
             "Отправьте ссылку следующим сообщением:")
 
     elif data == "menu_compare":
+        if chat_id in user_states:
+            del user_states[chat_id]
         show_section(call, "Сравнение товаров",
             "Отправьте мне несколько ссылок на товары\n"
             "Wildberries одним сообщением (каждая ссылка\n"
@@ -133,9 +149,27 @@ def callback_handler(call):
         show_history(call)
 
     elif data == "menu_back":
+        if chat_id in user_states:
+            del user_states[chat_id]
         bot.edit_message_text(WELCOME_TEXT, chat_id,
                              call.message.message_id, parse_mode="Markdown",
                              reply_markup=create_main_menu())
+
+    elif data == "find_solution":
+        user_states[chat_id] = "waiting_question"
+        bot.edit_message_text(
+            "Поиск решения проблемы\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Задайте вопрос о товаре.\n"
+            "Я поищу ответы в отзывах покупателей.\n\n"
+            "Примеры:\n"
+            "- Почему быстро разряжается?\n"
+            "- Как подключить через Bluetooth?\n"
+            "- Как убрать запах?\n"
+            "- Что делать если сломался?\n\n"
+            "Напишите свой вопрос следующим сообщением:",
+            chat_id, call.message.message_id,
+            reply_markup=create_back_button())
 
     bot.answer_callback_query(call.id)
 
@@ -144,6 +178,10 @@ def callback_handler(call):
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text
+
+    if user_states.get(chat_id) == "waiting_question":
+        handle_solution_query(message)
+        return
 
     if text.startswith('http') or text.startswith('www.'):
         lines = text.split('\n')
@@ -208,7 +246,15 @@ def analyze_single(message, url):
         gpt_result = analyze_reviews(all_reviews)
         final_result = format_result(gpt_result, len(reviews), positive, negative)
 
-        bot.send_message(chat_id, final_result, reply_markup=create_main_menu())
+        solution_markup = types.InlineKeyboardMarkup()
+        solution_markup.add(
+            types.InlineKeyboardButton("Найти решение проблемы", callback_data="find_solution")
+        )
+        solution_markup.add(types.InlineKeyboardButton("В меню", callback_data="menu_back"))
+
+        bot.send_message(chat_id, final_result, reply_markup=solution_markup)
+
+        user_reviews[chat_id] = reviews
         db.add_history(chat_id, "analyze", url)
 
     except Exception as e:
@@ -216,6 +262,52 @@ def analyze_single(message, url):
         bot.send_message(chat_id,
             "Произошла ошибка: " + type(e).__name__ + "\n\n"
             "Попробуйте позже или отправьте другой товар.",
+            reply_markup=create_main_menu())
+
+
+def handle_solution_query(message):
+    chat_id = message.chat.id
+    question = message.text
+
+    reviews = user_reviews.get(chat_id)
+    if not reviews:
+        bot.send_message(chat_id,
+            "Отзывы не загружены.\n\n"
+            "Сначала отправьте ссылку на товар для анализа.",
+            reply_markup=create_main_menu())
+        if chat_id in user_states:
+            del user_states[chat_id]
+        return
+
+    if chat_id in user_states:
+        del user_states[chat_id]
+
+    bot.send_message(chat_id, "Ищу решение в отзывах...")
+
+    try:
+        relevant = find_relevant_reviews(reviews, question)
+
+        if not relevant:
+            result = format_solution([], question, "")
+            bot.send_message(chat_id, result, reply_markup=create_main_menu())
+            db.add_history(chat_id, "solution", question)
+            return
+
+        review_texts = []
+        for item in relevant[:10]:
+            review_texts.append(item[0])
+        reviews_text = "\n\n".join(review_texts)
+
+        gpt_summary = summarize_solution(reviews_text, question)
+        result = format_solution(relevant, question, gpt_summary)
+        bot.send_message(chat_id, result, reply_markup=create_main_menu())
+
+        db.add_history(chat_id, "solution", question)
+
+    except Exception as e:
+        traceback.print_exc()
+        bot.send_message(chat_id,
+            "Произошла ошибка: " + type(e).__name__ + "\n\nПопробуйте позже.",
             reply_markup=create_main_menu())
 
 

@@ -211,3 +211,72 @@ def format_comparison(results):
         text = text + "\nТовар " + str(scores[0][0]) + " — лучший по отзывам покупателей."
 
     return text
+
+
+def format_solution(relevant_reviews, question, gpt_summary):
+    """Форматирует результат поиска решения проблемы."""
+    if not relevant_reviews:
+        result = "Поиск решения\n"
+        result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        result = result + "Вопрос: " + question + "\n\n"
+        result = result + "В отзывах покупателей пока не найдено информации по этому вопросу.\n\n"
+        result = result + "Возможно, никто ещё не сталкивался с такой ситуацией\n"
+        result = result + "или не описал её в отзыве."
+        return result
+
+    total_reviews = len(relevant_reviews)
+
+    solutions = []
+    examples = []
+    current = None
+
+    for line in gpt_summary.split("\n"):
+        line_clean = line.strip().lstrip("#").strip()
+        line_lower = line_clean.lower()
+
+        if "помогл" in line_lower or "решени" in line_lower or "рекоменд" in line_lower:
+            current = "solution"
+            continue
+        elif "пример" in line_lower or "цитат" in line_lower or "отзыв" in line_lower:
+            current = "example"
+            continue
+
+        clean = line_clean.lstrip("-•*0123456789. ").strip()
+        clean = _clean_markdown(clean)
+
+        if not clean or len(clean) <= 2:
+            continue
+
+        if current == "solution":
+            solutions.append(clean)
+        elif current == "example":
+            examples.append(clean)
+
+    result = "Поиск решения\n"
+    result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    result = result + "Вопрос: " + question + "\n\n"
+
+    if solutions:
+        result = result + "Что помогло:\n"
+        for i in range(len(solutions[:5])):
+            result = result + str(i + 1) + ". " + solutions[i] + "\n"
+
+    if not solutions and gpt_summary:
+        result = result + gpt_summary + "\n"
+
+    result = result + "\nВстречается в " + str(total_reviews) + " отзывах.\n"
+
+    if examples:
+        result = result + "\nПримеры:\n"
+        for ex in examples[:3]:
+            ex_clean = _clean_markdown(ex)
+            if len(ex_clean) > 150:
+                short = ex_clean[:150] + "..."
+            else:
+                short = ex_clean
+            if short.startswith("\u00ab") and short.endswith("\u00bb"):
+                result = result + "- " + short + "\n"
+            else:
+                result = result + "- \u00ab" + short + "\u00bb\n"
+
+    return result
