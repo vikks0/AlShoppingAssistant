@@ -18,8 +18,8 @@ cd AlShoppingAssistant
 ```
 python3 -m venv .venv
 source .venv/bin/activate
+# На Windows: source .venv\Scripts\activate
 ```
-*На Windows: `.venv\Scripts\activate`*
 
 3. Установите зависимости:
 ```
