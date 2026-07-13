@@ -111,28 +111,28 @@ def format_result(gpt_text, total_reviews, positive, negative):
     pluses, minuses, recommendation = _parse_gpt_response(gpt_text)
 
     result = ""
-    result = result + "Анализ отзывов\n"
+    result = result + "📊 Анализ отзывов\n"
     result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    result = result + "Отзывов: " + str(total_reviews) + "\n"
-    result = result + "Положительных: " + str(positive) + " (" + str(pos_percent) + "%)\n"
-    result = result + "Нейтральных: " + str(neutral) + " (" + str(neu_percent) + "%)\n"
-    result = result + "Отрицательных: " + str(negative) + " (" + str(neg_percent) + "%)\n"
+    result = result + "📝 Отзывов: " + str(total_reviews) + "\n"
+    result = result + "😊 Положительных: " + str(positive) + " (" + str(pos_percent) + "%)\n"
+    result = result + "😐 Нейтральных: " + str(neutral) + " (" + str(neu_percent) + "%)\n"
+    result = result + "😞 Отрицательных: " + str(negative) + " (" + str(neg_percent) + "%)\n"
     result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
     if pluses:
-        result = result + "\nПлюсы\n"
+        result = result + "\n✅ Плюсы\n"
         for p in pluses:
-            result = result + "- " + p + "\n"
+            result = result + "• " + p + "\n"
 
     if minuses:
-        result = result + "\nМинусы\n"
+        result = result + "\n⚠️ Минусы\n"
         for m in minuses:
-            result = result + "- " + m + "\n"
+            result = result + "• " + m + "\n"
 
     if not pluses and not minuses and gpt_text:
-        result = result + "\n" + gpt_text + "\n"
+        result = result + "\n🤖 " + gpt_text + "\n"
 
-    result = result + "\nИтог\n"
+    result = result + "\n⭐ Итог\n"
     if recommendation:
         result = result + recommendation + "\n"
     elif pos_percent >= 70:
@@ -147,7 +147,7 @@ def format_result(gpt_text, total_reviews, positive, negative):
 
 def format_comparison(results):
     """Форматирует результат сравнения товаров."""
-    text = "Сравнение товаров\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    text = "⚖️ Сравнение товаров\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
     for i in range(len(results)):
         item = results[i]
@@ -171,16 +171,16 @@ def format_comparison(results):
         else:
             short_url = url
 
-        text = text + "Товар " + str(num) + "\n"
-        text = text + short_url + "\n"
-        text = text + str(total) + " отзывов | +" + str(pos_percent) + "% | -" + str(neg_percent) + "%\n"
+        text = text + "📦 Товар " + str(num) + "\n"
+        text = text + "🔗 " + short_url + "\n"
+        text = text + "📝 " + str(total) + " отзывов | 👍 " + str(pos_percent) + "% | 👎 " + str(neg_percent) + "%\n"
 
         if pluses:
             top_pluses = pluses[:3]
-            text = text + "+ " + ", ".join(top_pluses) + "\n"
+            text = text + "✅ " + ", ".join(top_pluses) + "\n"
         if minuses:
             top_minuses = minuses[:3]
-            text = text + "- " + ", ".join(top_minuses) + "\n"
+            text = text + "⚠️ " + ", ".join(top_minuses) + "\n"
 
         text = text + "\n" + "─" * 30 + "\n\n"
 
@@ -202,13 +202,18 @@ def format_comparison(results):
                     scores[i] = scores[j]
                     scores[j] = temp
 
-        text = text + "Итог\n"
+        medals = ["🥇", "🥈", "🥉"]
+        text = text + "⭐ Итог\n"
         for rank in range(len(scores)):
             num = scores[rank][0]
             score = scores[rank][1]
-            text = text + str(rank + 1) + ". Товар " + str(num) + ": " + str(score) + "% положительных\n"
+            if rank < 3:
+                medal = medals[rank]
+            else:
+                medal = "  "
+            text = text + medal + " Товар " + str(num) + ": " + str(score) + "% положительных\n"
 
-        text = text + "\nТовар " + str(scores[0][0]) + " — лучший по отзывам покупателей."
+        text = text + "\n💡 Товар " + str(scores[0][0]) + " — лучший по отзывам покупателей."
 
     return text
 
@@ -216,10 +221,10 @@ def format_comparison(results):
 def format_solution(relevant_reviews, question, gpt_summary):
     """Форматирует результат поиска решения проблемы."""
     if not relevant_reviews:
-        result = "Поиск решения\n"
+        result = "🔍 Поиск решения\n"
         result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        result = result + "Вопрос: " + question + "\n\n"
-        result = result + "В отзывах покупателей пока не найдено информации по этому вопросу.\n\n"
+        result = result + "❓ Вопрос: " + question + "\n\n"
+        result = result + "❌ В отзывах покупателей пока не найдено информации по этому вопросу.\n\n"
         result = result + "Возможно, никто ещё не сталкивался с такой ситуацией\n"
         result = result + "или не описал её в отзыве."
         return result
@@ -252,31 +257,31 @@ def format_solution(relevant_reviews, question, gpt_summary):
         elif current == "example":
             examples.append(clean)
 
-    result = "Поиск решения\n"
+    result = "🔍 Поиск решения\n"
     result = result + "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    result = result + "Вопрос: " + question + "\n\n"
+    result = result + "❓ Вопрос: " + question + "\n\n"
 
     if solutions:
-        result = result + "Что помогло:\n"
+        result = result + "💡 Что помогло:\n"
         for i in range(len(solutions[:5])):
             result = result + str(i + 1) + ". " + solutions[i] + "\n"
 
     if not solutions and gpt_summary:
-        result = result + gpt_summary + "\n"
+        result = result + "💡 " + gpt_summary + "\n"
 
-    result = result + "\nВстречается в " + str(total_reviews) + " отзывах.\n"
+    result = result + "\n📊 Встречается в " + str(total_reviews) + " отзывах.\n"
 
     if examples:
-        result = result + "\nПримеры:\n"
+        result = result + "\n📝 Примеры:\n"
         for ex in examples[:3]:
             ex_clean = _clean_markdown(ex)
             if len(ex_clean) > 150:
                 short = ex_clean[:150] + "..."
             else:
                 short = ex_clean
-            if short.startswith("\u00ab") and short.endswith("\u00bb"):
-                result = result + "- " + short + "\n"
+            if short.startswith("«") and short.endswith("»"):
+                result = result + "— " + short + "\n"
             else:
-                result = result + "- \u00ab" + short + "\u00bb\n"
+                result = result + "— «" + short + "»\n"
 
     return result
