@@ -30,20 +30,15 @@ def create_browser():
 
 
 def _collect_reviews(browser):
-    html = browser.page_source
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(browser.page_source, "html.parser")
+
     reviews = []
 
-    cards = soup.select(".comments__item.feedback")
-    for card in cards:
-        text_items = card.select("[class*='feedback__text--item']")
-        if text_items:
-            parts = []
-            for item in text_items:
-                parts.append(item.get_text(strip=True))
-            review_text = " ".join(parts)
-            if review_text and len(review_text) > 10:
-                reviews.append(review_text)
+    for body in soup.find_all(attrs={"itemprop": "reviewBody"}):
+        text = body.get_text(" ", strip=True)
+
+        if text:
+            reviews.append(text)
 
     return reviews
 
