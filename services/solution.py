@@ -82,12 +82,7 @@ def find_relevant_reviews(reviews, question, top_n=10):
         if score > 0:
             scored.append([review, score])
 
-    for i in range(len(scored)):
-        for j in range(i + 1, len(scored)):
-            if scored[j][1] > scored[i][1]:
-                temp = scored[i]
-                scored[i] = scored[j]
-                scored[j] = temp
+    scored.sort(key=lambda x: x[1], reverse=True)
 
     result = []
     for item in scored[:top_n]:

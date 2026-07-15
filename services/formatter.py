@@ -195,12 +195,7 @@ def format_comparison(results):
                 pos_percent = 0
             scores.append([num, pos_percent])
 
-        for i in range(len(scores)):
-            for j in range(i + 1, len(scores)):
-                if scores[j][1] > scores[i][1]:
-                    temp = scores[i]
-                    scores[i] = scores[j]
-                    scores[j] = temp
+        scores.sort(key=lambda x: x[1], reverse=True)
 
         medals = ["🥇", "🥈", "🥉"]
         text = text + "⭐ Итог\n"
